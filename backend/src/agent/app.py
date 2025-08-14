@@ -7,16 +7,33 @@ from fastapi.staticfiles import StaticFiles
 app = FastAPI()
 
 
-def create_frontend_router(build_dir="../frontend/dist"):
+@app.get("/")
+async def root():
+    """Root endpoint with API information and frontend access."""
+    return {
+        "message": "Gemini Fullstack LangGraph API",
+        "frontend": "/app/ (use trailing slash)",
+        "frontend_files": "/app/index.html, /app/assets/*",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "openapi": "/openapi.json"
+    }
+
+
+
+
+
+def create_frontend_router(build_dir="frontend/dist"):
     """Creates a router to serve the React frontend.
 
     Args:
-        build_dir: Path to the React build directory relative to this file.
+        build_dir: Path to the React build directory relative to the working directory.
 
     Returns:
         A Starlette application serving the frontend.
     """
-    build_path = pathlib.Path(__file__).parent.parent.parent / build_dir
+    # Use absolute path since we know the container structure
+    build_path = pathlib.Path("/deps/frontend/dist")
 
     if not build_path.is_dir() or not (build_path / "index.html").is_file():
         print(
