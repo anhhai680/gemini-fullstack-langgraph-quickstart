@@ -1,4 +1,5 @@
 # mypy: disable - error - code = "no-untyped-def,misc"
+import os
 import pathlib
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
@@ -7,10 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 # Define the FastAPI app
 app = FastAPI()
 
+# Configure allowed origins for CORS
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    allowed_origins = ["*"]  # WARNING: In production, set ALLOWED_ORIGINS to restrict this to your frontend domain(s)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your frontend domain
+    allow_origins=allowed_origins,  # In production, restrict this to your frontend domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
