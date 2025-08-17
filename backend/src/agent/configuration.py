@@ -9,24 +9,47 @@ class Configuration(BaseModel):
     """The configuration for the agent."""
 
     query_generator_model: str = Field(
-        default="gemini-2.0-flash",
+        default="gpt-oss-20b",  # Changed to OpenRouter free model
         metadata={
             "description": "The name of the language model to use for the agent's query generation."
         },
     )
 
     reflection_model: str = Field(
-        default="gemini-2.5-flash",
+        default="gpt-oss-20b",  # Changed to OpenRouter free model
         metadata={
             "description": "The name of the language model to use for the agent's reflection."
         },
     )
 
     answer_model: str = Field(
-        default="gemini-2.5-pro",
+        default="gpt-oss-20b",  # Changed to OpenRouter free model
         metadata={
             "description": "The name of the language model to use for the agent's answer."
         },
+    )
+
+    # Add reasoning_model field to override default models
+    reasoning_model: Optional[str] = Field(
+        default=None,
+        metadata={
+            "description": "The reasoning model to use for all operations, overriding the default models."
+        },
+    )
+
+    # Add OpenRouter configuration
+    use_openrouter: bool = Field(
+        default=True,
+        metadata={
+            "description": "Whether to use OpenRouter for free models"
+        }
+    )
+
+    gemini_api_key: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_API_KEY"),
+        metadata={
+            "description": "Google Gemini API key for fallback"
+        }
     )
 
     number_of_initial_queries: int = Field(
@@ -57,4 +80,13 @@ class Configuration(BaseModel):
         # Filter out None values
         values = {k: v for k, v in raw_values.items() if v is not None}
 
-        return cls(**values)
+        # Create the configuration instance
+        config_instance = cls(**values)
+        
+        # If reasoning_model is provided, override all the default models
+        if config_instance.reasoning_model:
+            config_instance.query_generator_model = config_instance.reasoning_model
+            config_instance.reflection_model = config_instance.reasoning_model
+            config_instance.answer_model = config_instance.reasoning_model
+
+        return config_instance

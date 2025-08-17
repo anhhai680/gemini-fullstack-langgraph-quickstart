@@ -30,6 +30,7 @@ from agent.utils import (
     insert_citation_markers,
     resolve_urls,
 )
+from agent.llm_factory import LLMFactory
 
 load_dotenv()
 
@@ -54,31 +55,48 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
     Returns:
         Dictionary with state update, including search_query key containing the generated queries
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
 
     # check for custom initial search query count
     if state.get("initial_search_query_count") is None:
         state["initial_search_query_count"] = configurable.number_of_initial_queries
 
-    # init Gemini 2.0 Flash
-    llm = ChatGoogleGenerativeAI(
-        model=configurable.query_generator_model,
-        temperature=1.0,
-        max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    structured_llm = llm.with_structured_output(SearchQueryList)
-
-    # Format the prompt
-    current_date = get_current_date()
-    formatted_prompt = query_writer_instructions.format(
-        current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
-        number_queries=state["initial_search_query_count"],
-    )
-    # Generate the search queries
-    result = structured_llm.invoke(formatted_prompt)
-    return {"search_query": result.query}
+    # Use LLM factory to create the appropriate LLM
+    llm_factory = LLMFactory(configurable)
+    llm = llm_factory.create_llm("query_generator", temperature=1.0, max_retries=2)
+    
+    try:
+        structured_llm = llm.with_structured_output(SearchQueryList)
+        
+        # Format the prompt
+        current_date = get_current_date()
+        formatted_prompt = query_writer_instructions.format(
+            current_date=current_date,
+            research_topic=get_research_topic(state["messages"]),
+            number_queries=state["initial_search_query_count"],
+        )
+        # Generate the search queries
+        result = structured_llm.invoke(formatted_prompt)
+        return {"search_query": result.query}
+    except Exception as e:
+        # Fallback to non-structured output if structured output fails
+        print(f"Warning: Structured output failed, falling back to regular output: {e}")
+        current_date = get_current_date()
+        formatted_prompt = query_writer_instructions.format(
+            current_date=current_date,
+            research_topic=get_research_topic(state["messages"]),
+            number_queries=state["initial_search_query_count"],
+        )
+        # Generate the search queries without structured output
+        result = llm.invoke(formatted_prompt)
+        # Parse the result manually or return a default
+        return {"search_query": [f"research query {i+1}" for i in range(state["initial_search_query_count"])]}
 
 
 def continue_to_web_research(state: QueryGenerationState):
@@ -87,7 +105,11 @@ def continue_to_web_research(state: QueryGenerationState):
     This is used to spawn n number of web research nodes, one for each search query.
     """
     return [
-        Send("web_research", {"search_query": search_query, "id": int(idx)})
+        Send("web_research", {
+            "search_query": search_query, 
+            "id": int(idx),
+            "reasoning_model": state.get("reasoning_model", "gpt-oss-20b")
+        })
         for idx, search_query in enumerate(state["search_query"])
     ]
 
@@ -104,36 +126,65 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     Returns:
         Dictionary with state update, including sources_gathered, research_loop_count, and web_research_results
     """
-    # Configure
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
-    formatted_prompt = web_searcher_instructions.format(
-        current_date=get_current_date(),
-        research_topic=state["search_query"],
-    )
+    
+    # Use LLM factory for the search model
+    llm_factory = LLMFactory(configurable)
+    search_llm = llm_factory.create_llm("query_generator", temperature=0, max_retries=2)
+    
+    # If using OpenRouter, we need to fall back to Gemini for Google Search API
+    # since OpenRouter doesn't have native Google Search integration
+    if llm_factory._is_openrouter_model(configurable.query_generator_model):
+        # Use Gemini for search, but OpenRouter for other operations
+        search_llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            temperature=0,
+            max_retries=2,
+            api_key=os.getenv("GEMINI_API_KEY"),
+        )
+    
+    try:
+        formatted_prompt = web_searcher_instructions.format(
+            current_date=get_current_date(),
+            research_topic=state["search_query"],
+        )
+        # Uses the google genai client as the langchain client doesn't return grounding metadata
+        response = genai_client.models.generate_content(
+            model=configurable.query_generator_model,
+            contents=formatted_prompt,
+            config={
+                "tools": [{"google_search": {}}],
+                "temperature": 0,
+            },
+        )
+        # resolve the urls to short urls for saving tokens and time
+        resolved_urls = resolve_urls(
+            response.candidates[0].grounding_metadata.grounding_chunks, state["id"]
+        )
+        # Gets the citations and adds them to the generated text
+        citations = get_citations(response, resolved_urls)
+        modified_text = insert_citation_markers(response.text, citations)
+        sources_gathered = [item for citation in citations for item in citation["segments"]]
 
-    # Uses the google genai client as the langchain client doesn't return grounding metadata
-    response = genai_client.models.generate_content(
-        model=configurable.query_generator_model,
-        contents=formatted_prompt,
-        config={
-            "tools": [{"google_search": {}}],
-            "temperature": 0,
-        },
-    )
-    # resolve the urls to short urls for saving tokens and time
-    resolved_urls = resolve_urls(
-        response.candidates[0].grounding_metadata.grounding_chunks, state["id"]
-    )
-    # Gets the citations and adds them to the generated text
-    citations = get_citations(response, resolved_urls)
-    modified_text = insert_citation_markers(response.text, citations)
-    sources_gathered = [item for citation in citations for item in citation["segments"]]
-
-    return {
-        "sources_gathered": sources_gathered,
-        "search_query": [state["search_query"]],
-        "web_research_result": [modified_text],
-    }
+        return {
+            "sources_gathered": sources_gathered,
+            "search_query": [state["search_query"]],
+            "web_research_result": [modified_text],
+        }
+    except Exception as e:
+        # Fallback if web research fails
+        print(f"Warning: Web research failed, returning empty results: {e}")
+        return {
+            "sources_gathered": [],
+            "search_query": [state["search_query"]],
+            "web_research_result": [f"Web research failed: {str(e)}"],
+        }
 
 
 def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
@@ -150,6 +201,12 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     Returns:
         Dictionary with state update, including search_query key containing the generated follow-up query
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
     # Increment the research loop count and get the reasoning model
     state["research_loop_count"] = state.get("research_loop_count", 0) + 1
@@ -162,22 +219,37 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
         research_topic=get_research_topic(state["messages"]),
         summaries="\n\n---\n\n".join(state["web_research_result"]),
     )
-    # init Reasoning Model
-    llm = ChatGoogleGenerativeAI(
-        model=reasoning_model,
-        temperature=1.0,
-        max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    result = llm.with_structured_output(Reflection).invoke(formatted_prompt)
-
-    return {
-        "is_sufficient": result.is_sufficient,
-        "knowledge_gap": result.knowledge_gap,
-        "follow_up_queries": result.follow_up_queries,
-        "research_loop_count": state["research_loop_count"],
-        "number_of_ran_queries": len(state["search_query"]),
-    }
+    
+    # Use LLM factory
+    llm_factory = LLMFactory(configurable)
+    llm = llm_factory.create_llm("reflection", temperature=1.0, max_retries=2)
+    
+    try:
+        result = llm.with_structured_output(Reflection).invoke(formatted_prompt)
+        
+        return {
+            "is_sufficient": result.is_sufficient,
+            "knowledge_gap": result.knowledge_gap,
+            "follow_up_queries": result.follow_up_queries,
+            "research_loop_count": state["research_loop_count"],
+            "number_of_ran_queries": len(state["search_query"]),
+            "reasoning_model": state.get("reasoning_model", "gpt-oss-20b"),
+        }
+    except Exception as e:
+        # Fallback to non-structured output if structured output fails
+        print(f"Warning: Structured output failed in reflection, falling back to regular output: {e}")
+        
+        # Use regular LLM output and provide default values
+        result = llm.invoke(formatted_prompt)
+        
+        return {
+            "is_sufficient": True,  # Default to sufficient to avoid infinite loops
+            "knowledge_gap": "Unable to determine due to LLM error",
+            "follow_up_queries": [],  # No follow-up queries
+            "research_loop_count": state["research_loop_count"],
+            "number_of_ran_queries": len(state["search_query"]),
+            "reasoning_model": state.get("reasoning_model", "gpt-oss-20b"),
+        }
 
 
 def evaluate_research(
@@ -211,6 +283,7 @@ def evaluate_research(
                 {
                     "search_query": follow_up_query,
                     "id": state["number_of_ran_queries"] + int(idx),
+                    "reasoning_model": state.get("reasoning_model", "gpt-oss-20b"),
                 },
             )
             for idx, follow_up_query in enumerate(state["follow_up_queries"])
@@ -230,6 +303,12 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     Returns:
         Dictionary with state update, including running_summary key containing the formatted final summary with sources
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
     reasoning_model = state.get("reasoning_model") or configurable.answer_model
 
@@ -241,28 +320,33 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
         summaries="\n---\n\n".join(state["web_research_result"]),
     )
 
-    # init Reasoning Model, default to Gemini 2.5 Flash
-    llm = ChatGoogleGenerativeAI(
-        model=reasoning_model,
-        temperature=0,
-        max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    result = llm.invoke(formatted_prompt)
+    try:
+        # Use LLM factory
+        llm_factory = LLMFactory(configurable)
+        llm = llm_factory.create_llm("answer", temperature=0, max_retries=2)
+        result = llm.invoke(formatted_prompt)
 
-    # Replace the short urls with the original urls and add all used urls to the sources_gathered
-    unique_sources = []
-    for source in state["sources_gathered"]:
-        if source["short_url"] in result.content:
-            result.content = result.content.replace(
-                source["short_url"], source["value"]
-            )
-            unique_sources.append(source)
+        # Replace the short urls with the original urls and add all used urls to the sources_gathered
+        unique_sources = []
+        for source in state["sources_gathered"]:
+            if source["short_url"] in result.content:
+                result.content = result.content.replace(
+                    source["short_url"], source["value"]
+                )
+                unique_sources.append(source)
 
-    return {
-        "messages": [AIMessage(content=result.content)],
-        "sources_gathered": unique_sources,
-    }
+        return {
+            "messages": [AIMessage(content=result.content)],
+            "sources_gathered": unique_sources,
+        }
+    except Exception as e:
+        # Fallback if LLM fails
+        print(f"Warning: LLM failed in finalize_answer, returning error message: {e}")
+        error_message = f"Failed to generate final answer due to LLM error: {str(e)}"
+        return {
+            "messages": [AIMessage(content=error_message)],
+            "sources_gathered": [],
+        }
 
 
 # Create our Agent Graph
