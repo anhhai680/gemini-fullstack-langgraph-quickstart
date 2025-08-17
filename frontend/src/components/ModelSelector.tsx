@@ -35,7 +35,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     const fetchModels = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:2024/api/models");
+        const response = await fetch("http://localhost:8123/api/models");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -50,46 +50,46 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         console.error("Failed to fetch models:", err);
         setError(err instanceof Error ? err.message : "Failed to fetch models");
         
-        // Fallback to hardcoded models if API fails
-        const fallbackModels: Model[] = [
-          {
-            id: "gpt-oss-20b",
-            name: "gpt-oss-20b",
-            provider: "OpenRouter",
-            provider_icon: "🔗",
-            category: "Free",
-            context_length: 8192,
-            description: "Free OpenAI model via OpenRouter"
-          },
-          {
-            id: "gemini-2.0-flash",
-            name: "2.0 Flash",
-            provider: "Google",
-            provider_icon: "⚡",
-            category: "Paid",
-            context_length: 8192,
-            description: "Fast and efficient Gemini model"
-          },
-          {
-            id: "gemini-2.5-flash-preview-04-17",
-            name: "2.5 Flash",
-            provider: "Google",
-            provider_icon: "⚡",
-            category: "Paid",
-            context_length: 8192,
-            description: "Latest Gemini Flash model"
-          },
-          {
-            id: "gemini-2.5-pro-preview-05-06",
-            name: "2.5 Pro",
-            provider: "Google",
-            provider_icon: "⚙️",
-            category: "Paid",
-            context_length: 8192,
-            description: "High-quality Gemini Pro model"
-          }
-        ];
-        setModels(fallbackModels);
+        // // Fallback to hardcoded models if API fails
+        // const fallbackModels: Model[] = [
+        //   {
+        //     id: "gpt-oss-20b",
+        //     name: "gpt-oss-20b",
+        //     provider: "OpenRouter",
+        //     provider_icon: "🔗",
+        //     category: "Free",
+        //     context_length: 8192,
+        //     description: "Free OpenAI model via OpenRouter"
+        //   },
+        //   {
+        //     id: "gemini-2.0-flash",
+        //     name: "2.0 Flash",
+        //     provider: "Google",
+        //     provider_icon: "⚡",
+        //     category: "Paid",
+        //     context_length: 8192,
+        //     description: "Fast and efficient Gemini model"
+        //   },
+        //   {
+        //     id: "gemini-2.5-flash-preview-04-17",
+        //     name: "2.5 Flash",
+        //     provider: "Google",
+        //     provider_icon: "⚡",
+        //     category: "Paid",
+        //     context_length: 8192,
+        //     description: "Latest Gemini Flash model"
+        //   },
+        //   {
+        //     id: "gemini-2.5-pro-preview-05-06",
+        //     name: "2.5 Pro",
+        //     provider: "Google",
+        //     provider_icon: "⚙️",
+        //     category: "Paid",
+        //     context_length: 8192,
+        //     description: "High-quality Gemini Pro model"
+        //   }
+        // ];
+        // setModels(fallbackModels);
       } finally {
         setLoading(false);
       }

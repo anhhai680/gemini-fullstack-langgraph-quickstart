@@ -27,6 +27,7 @@ class ReflectionState(TypedDict):
     follow_up_queries: Annotated[list, operator.add]
     research_loop_count: int
     number_of_ran_queries: int
+    reasoning_model: str
 
 
 class Query(TypedDict):
@@ -36,11 +37,13 @@ class Query(TypedDict):
 
 class QueryGenerationState(TypedDict):
     search_query: list[Query]
+    reasoning_model: str
 
 
 class WebSearchState(TypedDict):
     search_query: str
     id: str
+    reasoning_model: str
 
 
 @dataclass(kw_only=True)

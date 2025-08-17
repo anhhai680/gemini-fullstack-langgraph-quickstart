@@ -29,6 +29,14 @@ class Configuration(BaseModel):
         },
     )
 
+    # Add reasoning_model field to override default models
+    reasoning_model: Optional[str] = Field(
+        default=None,
+        metadata={
+            "description": "The reasoning model to use for all operations, overriding the default models."
+        },
+    )
+
     # Add OpenRouter configuration
     use_openrouter: bool = Field(
         default=True,
@@ -72,4 +80,13 @@ class Configuration(BaseModel):
         # Filter out None values
         values = {k: v for k, v in raw_values.items() if v is not None}
 
-        return cls(**values)
+        # Create the configuration instance
+        config_instance = cls(**values)
+        
+        # If reasoning_model is provided, override all the default models
+        if config_instance.reasoning_model:
+            config_instance.query_generator_model = config_instance.reasoning_model
+            config_instance.reflection_model = config_instance.reasoning_model
+            config_instance.answer_model = config_instance.reasoning_model
+
+        return config_instance

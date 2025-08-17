@@ -51,8 +51,12 @@ class LLMFactory:
         else:
             raise ValueError(f"Unknown model type: {model_type}")
         
+        # Debug: Show which model is being used
+        print(f"DEBUG: Creating {model_type} LLM with model: {model_name}")
+        print(f"DEBUG: Configuration reasoning_model: {getattr(self.config, 'reasoning_model', 'Not set')}")
+        
         try:
-            print(f"DEBUG: model_name: {model_name}")
+            print(f"DEBUG: model_name: {model_name} with type {model_type}")
             print(f"DEBUG: self.config.use_openrouter: {self.config.use_openrouter}")
             print(f"DEBUG: self._is_openrouter_model({model_name}): {self._is_openrouter_model(model_name)}")
 

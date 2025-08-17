@@ -55,6 +55,12 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
     Returns:
         Dictionary with state update, including search_query key containing the generated queries
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
 
     # check for custom initial search query count
@@ -99,7 +105,11 @@ def continue_to_web_research(state: QueryGenerationState):
     This is used to spawn n number of web research nodes, one for each search query.
     """
     return [
-        Send("web_research", {"search_query": search_query, "id": int(idx)})
+        Send("web_research", {
+            "search_query": search_query, 
+            "id": int(idx),
+            "reasoning_model": state.get("reasoning_model", "gpt-oss-20b")
+        })
         for idx, search_query in enumerate(state["search_query"])
     ]
 
@@ -116,6 +126,12 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     Returns:
         Dictionary with state update, including sources_gathered, research_loop_count, and web_research_results
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
     
     # Use LLM factory for the search model
@@ -185,6 +201,12 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     Returns:
         Dictionary with state update, including search_query key containing the generated follow-up query
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
     # Increment the research loop count and get the reasoning model
     state["research_loop_count"] = state.get("research_loop_count", 0) + 1
@@ -211,6 +233,7 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
             "follow_up_queries": result.follow_up_queries,
             "research_loop_count": state["research_loop_count"],
             "number_of_ran_queries": len(state["search_query"]),
+            "reasoning_model": state.get("reasoning_model", "gpt-oss-20b"),
         }
     except Exception as e:
         # Fallback to non-structured output if structured output fails
@@ -225,6 +248,7 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
             "follow_up_queries": [],  # No follow-up queries
             "research_loop_count": state["research_loop_count"],
             "number_of_ran_queries": len(state["search_query"]),
+            "reasoning_model": state.get("reasoning_model", "gpt-oss-20b"),
         }
 
 
@@ -259,6 +283,7 @@ def evaluate_research(
                 {
                     "search_query": follow_up_query,
                     "id": state["number_of_ran_queries"] + int(idx),
+                    "reasoning_model": state.get("reasoning_model", "gpt-oss-20b"),
                 },
             )
             for idx, follow_up_query in enumerate(state["follow_up_queries"])
@@ -278,6 +303,12 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     Returns:
         Dictionary with state update, including running_summary key containing the formatted final summary with sources
     """
+    # Pass reasoning_model from state to configuration
+    if "configurable" not in config:
+        config["configurable"] = {}
+    if state.get("reasoning_model"):
+        config["configurable"]["reasoning_model"] = state["reasoning_model"]
+    
     configurable = Configuration.from_runnable_config(config)
     reasoning_model = state.get("reasoning_model") or configurable.answer_model
 
