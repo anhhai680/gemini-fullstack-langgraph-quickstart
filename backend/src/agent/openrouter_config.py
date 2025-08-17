@@ -1,6 +1,9 @@
 import os
 from typing import Dict, Any, ClassVar
 from pydantic import BaseModel, Field
+from logging import Logger
+
+logger: Logger = Logger.getLogger(__name__)
 
 class OpenRouterConfig(BaseModel):
     """Configuration for OpenRouter integration."""
@@ -58,12 +61,12 @@ class OpenRouterConfig(BaseModel):
     
     def validate_api_key(self) -> str:
         """Validate that OpenRouter API key is set and return the key."""
-        print(f"Debug: OpenRouter API key check - key exists: {bool(self.api_key)}, key length: {len(self.api_key) if self.api_key else 0}")
+        logger.debug(f"Debug: OpenRouter API key check - key exists: {bool(self.api_key)}, key length: {len(self.api_key) if self.api_key else 0}")
         if not self.api_key:
             raise ValueError("OPENROUTER_API_KEY environment variable is required")
         if not self.api_key.strip():
             raise ValueError("OPENROUTER_API_KEY environment variable cannot be empty")
         # Return the first few characters for debugging (safely)
         safe_key = self.api_key.strip()
-        print(f"Debug: Using OpenRouter API key starting with: {safe_key[:8]}...")
+        logger.debug(f"Debug: Using OpenRouter API key starting with: {safe_key[:8]}...")
         return safe_key
