@@ -17,7 +17,7 @@ class OpenRouterConfig(BaseModel):
     
     # Free models available through OpenRouter
     FREE_MODELS: ClassVar[Dict[str, Dict[str, Any]]] = {
-        "gpt-oss-20b:free": {
+        "gpt-oss-20b": {
             "provider": "openai",
             "model": "openai/gpt-oss-20b:free",
             "context_length": 8192,
