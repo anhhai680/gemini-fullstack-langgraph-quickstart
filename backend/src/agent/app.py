@@ -61,7 +61,7 @@ async def get_available_models():
             "description": "Fast and efficient Gemini model"
         },
         {
-            "id": "gemini-2.5-flash-preview-04-17",
+            "id": "gemini-2.5-flash",
             "name": "2.5 Flash",
             "provider": "Google",
             "provider_icon": "⚡",
@@ -70,7 +70,7 @@ async def get_available_models():
             "description": "Latest Gemini Flash model"
         },
         {
-            "id": "gemini-2.5-pro-preview-05-06",
+            "id": "gemini-2.5-pro",
             "name": "2.5 Pro",
             "provider": "Google",
             "provider_icon": "⚙️",

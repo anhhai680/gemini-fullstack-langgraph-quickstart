@@ -23,15 +23,27 @@ class OpenRouterConfig(BaseModel):
             "context_length": 8192,
             "free": True
         },
-        "llama-3.1-8b-instruct": {
-            "provider": "meta",
-            "model": "llama-3.1-8b-instruct",
+        "deepseek-chat-v3-0324": {
+            "provider": "deepseek",
+            "model": "deepseek/deepseek-chat-v3-0324:free",
             "context_length": 8192,
             "free": True
         },
-        "gemma-2-9b-it": {
-            "provider": "google",
-            "model": "gemma-2-9b-it",
+        "deepseek-r1-0528": {
+            "provider": "deepseek",
+            "model": "deepseek/deepseek-r1-0528:free",
+            "context_length": 8192,
+            "free": True
+        },
+        "deepseek-r1": {
+            "provider": "deepseek",
+            "model": "deepseek/deepseek-r1:free",
+            "context_length": 8192,
+            "free": True
+        },
+        "deepseek-r1-distill-llama-70b": {
+            "provider": "deepseek",
+            "model": "deepseek/deepseek-r1-distill-llama-70b:free",
             "context_length": 8192,
             "free": True
         }
