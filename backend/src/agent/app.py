@@ -1,12 +1,12 @@
 # mypy: disable - error - code = "no-untyped-def,misc"
 import os
 import pathlib
+import logging
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from logging import Logger
 
-logger: Logger = Logger.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 # Define the FastAPI app
 app = FastAPI()
@@ -95,9 +95,6 @@ async def get_available_models():
         "models": openrouter_models + gemini_models,
         "default_model": "gpt-oss-20b"
     }
-
-
-
 
 
 def create_frontend_router(build_dir="frontend/dist"):

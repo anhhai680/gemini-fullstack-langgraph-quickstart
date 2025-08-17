@@ -1,4 +1,4 @@
-from logging import Logger
+import logging
 import os
 from typing import Optional, Union
 from langchain_core.language_models import BaseChatModel
@@ -8,7 +8,7 @@ from agent.configuration import Configuration
 from agent.openrouter_config import OpenRouterConfig
 from dotenv import load_dotenv
 
-logger: Logger = Logger.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 class LLMFactory:
     """Factory for creating different LLM instances."""

@@ -1,9 +1,9 @@
 import os
+import logging
 from typing import Dict, Any, ClassVar
 from pydantic import BaseModel, Field
-from logging import Logger
 
-logger: Logger = Logger.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 class OpenRouterConfig(BaseModel):
     """Configuration for OpenRouter integration."""
