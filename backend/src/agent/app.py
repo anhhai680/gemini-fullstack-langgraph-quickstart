@@ -4,6 +4,9 @@ import pathlib
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from logging import Logger
+
+logger: Logger = Logger.getLogger(__name__)
 
 # Define the FastAPI app
 app = FastAPI()
@@ -110,7 +113,7 @@ def create_frontend_router(build_dir="frontend/dist"):
     build_path = pathlib.Path("/deps/frontend/dist")
 
     if not build_path.is_dir() or not (build_path / "index.html").is_file():
-        print(
+        logger.warning(
             f"WARN: Frontend build directory not found or incomplete at {build_path}. Serving frontend will likely fail."
         )
         # Return a dummy router if build isn't ready
