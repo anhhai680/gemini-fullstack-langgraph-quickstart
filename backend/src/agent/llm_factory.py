@@ -1,3 +1,4 @@
+from logging import Logger
 import os
 from typing import Optional, Union
 from langchain_core.language_models import BaseChatModel
@@ -7,6 +8,8 @@ from agent.configuration import Configuration
 from agent.openrouter_config import OpenRouterConfig
 from dotenv import load_dotenv
 
+logger: Logger = Logger.getLogger(__name__)
+
 class LLMFactory:
     """Factory for creating different LLM instances."""
     
@@ -15,12 +18,12 @@ class LLMFactory:
         load_dotenv()
         
         # Debug: Check what environment variables are available
-        print(f"Debug: Environment check in LLMFactory:")
-        print(f"  - OPENROUTER_API_KEY exists: {'OPENROUTER_API_KEY' in os.environ}")
-        print(f"  - GEMINI_API_KEY exists: {'GEMINI_API_KEY' in os.environ}")
-        print(f"  - Current working directory: {os.getcwd()}")
-        print(f"  - Configuration use_openrouter: {config.use_openrouter}")
-        print(f"  - Configuration query_generator_model: {config.query_generator_model}")
+        logger.debug(f"Debug: Environment check in LLMFactory:")
+        logger.debug(f"  - OPENROUTER_API_KEY exists: {'OPENROUTER_API_KEY' in os.environ}")
+        logger.debug(f"  - GEMINI_API_KEY exists: {'GEMINI_API_KEY' in os.environ}")
+        logger.debug(f"  - Current working directory: {os.getcwd()}")
+        logger.debug(f"  - Configuration use_openrouter: {config.use_openrouter}")
+        logger.debug(f"  - Configuration query_generator_model: {config.query_generator_model}")
         
         self.config = config
         self.openrouter_config = OpenRouterConfig()
@@ -52,55 +55,55 @@ class LLMFactory:
             raise ValueError(f"Unknown model type: {model_type}")
         
         # Debug: Show which model is being used
-        print(f"DEBUG: Creating {model_type} LLM with model: {model_name}")
-        print(f"DEBUG: Configuration reasoning_model: {getattr(self.config, 'reasoning_model', 'Not set')}")
+        logger.debug(f"DEBUG: Creating {model_type} LLM with model: {model_name}")
+        logger.debug(f"DEBUG: Configuration reasoning_model: {getattr(self.config, 'reasoning_model', 'Not set')}")
         
         try:
-            print(f"DEBUG: model_name: {model_name} with type {model_type}")
-            print(f"DEBUG: self.config.use_openrouter: {self.config.use_openrouter}")
-            print(f"DEBUG: self._is_openrouter_model({model_name}): {self._is_openrouter_model(model_name)}")
+            logger.debug(f"DEBUG: model_name: {model_name} with type {model_type}")
+            logger.debug(f"DEBUG: self.config.use_openrouter: {self.config.use_openrouter}")
+            logger.debug(f"DEBUG: self._is_openrouter_model({model_name}): {self._is_openrouter_model(model_name)}")
 
             # Check if it's an OpenRouter model and if OpenRouter is enabled
             if self._is_openrouter_model(model_name) and self.config.use_openrouter:
                 # Check if OpenRouter API key is available before trying to use it
                 if not os.getenv('OPENROUTER_API_KEY'):
-                    print(f"Warning: OPENROUTER_API_KEY not set, falling back to Gemini for {model_name}")
+                    logger.debug(f"Warning: OPENROUTER_API_KEY not set, falling back to Gemini for {model_name}")
                     return self._create_gemini_llm("gemini-2.0-flash", temperature, max_retries)
                 
                 # Check if we should skip OpenRouter due to previous credit issues
                 if hasattr(self, '_skip_openrouter_due_to_credits'):
-                    print(f"Warning: Skipping OpenRouter for {model_name} due to previous credit issues, using Gemini")
+                    logger.debug(f"Warning: Skipping OpenRouter for {model_name} due to previous credit issues, using Gemini")
                     return self._create_gemini_llm("gemini-2.0-flash", temperature, max_retries)
                 
-                print(f"Creating OpenRouter LLM with model: {model_name}")
+                logger.debug(f"Creating OpenRouter LLM with model: {model_name}")
                 return self._create_openrouter_llm(model_name, temperature, max_retries)
             else:
                 # Fall back to Google Gemini
-                print(f"Creating Gemini LLM with model: {model_name}")
+                logger.debug(f"Creating Gemini LLM with model: {model_name}")
                 return self._create_gemini_llm(model_name, temperature, max_retries)
         except Exception as e:
             # Check if it's a credit limit error and provide specific guidance
             error_message = str(e).lower()
             if "insufficient credits" in error_message or "402" in error_message:
-                print(f"Warning: OpenRouter credit limit reached for {model_name}, falling back to Gemini")
-                print("💡 To use OpenRouter models, add credits at: https://openrouter.ai/settings/credits")
+                logger.error(f"Warning: OpenRouter credit limit reached for {model_name}, falling back to Gemini")
+                logger.error("💡 To use OpenRouter models, add credits at: https://openrouter.ai/settings/credits")
                 # Set flag to skip OpenRouter for future requests to avoid repeated credit errors
                 self._skip_openrouter_due_to_credits = True
                 return self._create_gemini_llm("gemini-2.0-flash", temperature, max_retries)
             elif "authentication" in error_message or "401" in error_message:
-                print(f"Warning: OpenRouter authentication failed for {model_name}, falling back to Gemini")
-                print("💡 Check your OPENROUTER_API_KEY environment variable")
+                logger.error(f"Warning: OpenRouter authentication failed for {model_name}, falling back to Gemini")
+                logger.error("💡 Check your OPENROUTER_API_KEY environment variable")
                 return self._create_gemini_llm("gemini-2.0-flash", temperature, max_retries)
             else:
                 # Fallback to Gemini for other errors
-                print(f"Warning: Failed to create {model_type} LLM with {model_name}, falling back to Gemini: {e}")
-                print(f"Error type: {type(e).__name__}")
+                logger.error(f"Warning: Failed to create {model_type} LLM with {model_name}, falling back to Gemini: {e}")
+                logger.error(f"Error type: {type(e).__name__}")
                 return self._create_gemini_llm("gemini-2.0-flash", temperature, max_retries)
     
     def _is_openrouter_model(self, model_name: str) -> bool:
         """Check if the model name corresponds to an OpenRouter model."""
         result = model_name in self.openrouter_config.FREE_MODELS
-        print(f"DEBUG: result of {model_name} in {self.openrouter_config.FREE_MODELS} : {result}")
+        logger.debug(f"DEBUG: result of {model_name} in {self.openrouter_config.FREE_MODELS} : {result}")
         return result
     
     def _create_openrouter_llm(
@@ -117,11 +120,10 @@ class LLMFactory:
         
         model_config = self.openrouter_config.get_free_model_config(model_name)
         
-        print(f"Debug: Creating OpenRouter LLM with:")
-        print(f"  - Model: {model_config['model']}")
-        print(f"  - API Key: {api_key[:8]}...")
-        print(f"  - Base URL: {self.openrouter_config.base_url}")
-        print(f"  - Temperature: {temperature}")
+        logger.debug(f"Debug: Creating OpenRouter LLM with:")
+        logger.debug(f"  - Model: {model_config['model']}")
+        logger.debug(f"  - Base URL: {self.openrouter_config.base_url}")
+        logger.debug(f"  - Temperature: {temperature}")
         
         # Create the LLM with minimal configuration to avoid compatibility issues
         # OpenRouter models work best with basic configuration
@@ -155,7 +157,7 @@ class LLMFactory:
         """Reset the flag that skips OpenRouter due to credit issues."""
         if hasattr(self, '_skip_openrouter_due_to_credits'):
             delattr(self, '_skip_openrouter_due_to_credits')
-            print("✅ OpenRouter credits flag reset - will try OpenRouter models again")
+            logger.debug("✅ OpenRouter credits flag reset - will try OpenRouter models again")
         else:
-            print("ℹ️ No OpenRouter credits flag to reset")
+            logger.debug("ℹ️ No OpenRouter credits flag to reset")
 
