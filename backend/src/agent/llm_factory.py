@@ -52,6 +52,10 @@ class LLMFactory:
             raise ValueError(f"Unknown model type: {model_type}")
         
         try:
+            print(f"DEBUG: model_name: {model_name}")
+            print(f"DEBUG: self.config.use_openrouter: {self.config.use_openrouter}")
+            print(f"DEBUG: self._is_openrouter_model({model_name}): {self._is_openrouter_model(model_name)}")
+
             # Check if it's an OpenRouter model and if OpenRouter is enabled
             if self._is_openrouter_model(model_name) and self.config.use_openrouter:
                 # Check if OpenRouter API key is available before trying to use it
@@ -91,7 +95,9 @@ class LLMFactory:
     
     def _is_openrouter_model(self, model_name: str) -> bool:
         """Check if the model name corresponds to an OpenRouter model."""
-        return model_name in self.openrouter_config.FREE_MODELS
+        result = model_name in self.openrouter_config.FREE_MODELS
+        print(f"DEBUG: result of {model_name} in {self.openrouter_config.FREE_MODELS} : {result}")
+        return result
     
     def _create_openrouter_llm(
         self, 
